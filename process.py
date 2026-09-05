@@ -24,7 +24,7 @@ def get_content():
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
 
-    # دریافت مستقیم
+    # تلاش اول: دانلود مستقیم
     try:
         req = urllib.request.Request(SUB_URL, headers=headers)
         with urllib.request.urlopen(req, context=context, timeout=15) as response:
@@ -34,7 +34,7 @@ def get_content():
     except Exception as e:
         print(f"Direct fetch failed: {e}")
 
-    # دریافت از طریق پراکسی واسط
+    # تلاش دوم: استفاده از پراکسی واسط برای عبور از تحریم/بلاک
     try:
         proxy_url = "https://corsproxy.io/?" + urllib.parse.quote(SUB_URL)
         req = urllib.request.Request(proxy_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -55,7 +55,6 @@ def fetch_and_process():
         return
 
     content = raw_content
-    # دکود بیس۶۴ در صورت لزوم
     if not any(raw_content.startswith(p) for p in ['vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria2://', 'tuic://']):
         try:
             padded_content = raw_content + '=' * (-len(raw_content) % 4)
@@ -93,17 +92,14 @@ def fetch_and_process():
     print(f"Total configs extracted: {len(processed_configs)}")
 
     if processed_configs:
-        # ۱. ذخیره به‌صورت Plain Text
         final_plain = "\n".join(processed_configs)
-        with open("sub_plain.txt", "w", encoding="utf-8") as f:
-            f.write(final_plain)
-
-        # ۲. ذخیره به‌صورت Base64
         final_base64 = base64.b64encode(final_plain.encode('utf-8')).decode('utf-8')
-        with open("sub.txt", "w", encoding="utf-8") as f:
+
+        # ذخیره خروجی در فایلی که ساختی
+        with open("Configvibes.txt", "w", encoding="utf-8") as f:
             f.write(final_base64)
 
-        print("Both sub.txt and sub_plain.txt updated successfully!")
+        print("Configvibes.txt updated successfully!")
 
 if __name__ == "__main__":
     fetch_and_process()
