@@ -3,12 +3,10 @@ import base64
 import json
 import random
 
-# ۱. آدرس منبع کانفیگ‌ها
 SOURCES = [
     "https://raw.githubusercontent.com/barry-far/V2ray-config/main/Splitted-By-Protocol/vless.txt",
 ]
 
-# لیست متنوعی از ایموجی‌های محبوب کیبورد
 EMOJIS = [
     "🎀", "✨", "⚡", "🔥", "🚀", "💎", "⭐", "💫", "👑", "🌟", 
     "🎯", "🎲", "🔮", "🧿", "🍀", "🌺", "🌸", "🦋", "🦄", "🎨", 
@@ -44,7 +42,6 @@ def fetch_configs():
     return list(dict.fromkeys(raw_lines))
 
 def rename_config(config_str, new_remark):
-    """تغییر نام رمارک کانفیگ"""
     if any(config_str.startswith(proto) for proto in ['vless://', 'trojan://', 'ss://']):
         if '#' in config_str:
             base = config_str.split('#')[0]
@@ -69,7 +66,6 @@ def process_configs():
     configs = fetch_configs()
     processed = []
     
-    # نمونه‌برداری تصادفی از لیست ایموجی‌ها برای داشتن تنوع بالا
     emoji_pool = random.choices(EMOJIS, k=MAX_CONFIGS)
     
     for i, cfg in enumerate(configs):
@@ -80,16 +76,11 @@ def process_configs():
         renamed = rename_config(cfg, f"{emoji} {NEW_NAME} | {i+1}")
         processed.append(renamed)
         
-    # ذخیره متنی ساده
-    with open("configs.txt", "w", encoding="utf-8") as f:
+    # ذخیره در همان فایلی که در گیت‌هاب داری (Configvibes.txt)
+    with open("Configvibes.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(processed))
-        
-    # ذخیره به‌صورت Base64
-    b64_encoded = base64.b64encode("\n".join(processed).encode("utf-8")).decode("utf-8")
-    with open("sub_base64.txt", "w", encoding="utf-8") as f_b64:
-        f_b64.write(b64_encoded)
 
-    print(f"Successfully processed {len(processed)} configs with diverse emojis.")
+    print(f"Successfully processed {len(processed)} configs.")
 
 if __name__ == "__main__":
     process_configs()
