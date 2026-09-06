@@ -1,106 +1,95 @@
-
 import urllib.request
-import urllib.parse
 import base64
-import ssl
+import json
+import random
 
-SUPERSCRIPT_DIGITS = {
-    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
-}
+# ۱. آدرس منبع کانفیگ‌ها
+SOURCES = [
+    "https://raw.githubusercontent.com/barry-far/V2ray-config/main/Splitted-By-Protocol/vless.txt",
+]
 
-def to_superscript(num):
-    return ''.join(SUPERSCRIPT_DIGITS.get(char, char) for char in str(num))
+# لیست متنوعی از ایموجی‌های محبوب کیبورد
+EMOJIS = [
+    "🎀", "✨", "⚡", "🔥", "🚀", "💎", "⭐", "💫", "👑", "🌟", 
+    "🎯", "🎲", "🔮", "🧿", "🍀", "🌺", "🌸", "🦋", "🦄", "🎨", 
+    "🛸", "🪐", "🌐", "⚡️", "🌊", "🌙", "☀️", "🎧", "🎮", "⚜️"
+]
 
-SUB_URL = "https://opti.testspeedpro.ir/vlessagg/sub/6MLH-W6rfyxoUgC0JKu6dZmTGYdx4yE5"
+NEW_NAME = "@Configvibes"
+MAX_CONFIGS = 100
 
-def get_content():
-    headers = {
-        'User-Agent': 'v2rayNG/1.8.5',
-        'Accept': '*/*',
-        'Connection': 'keep-alive'
-    }
+def fetch_configs():
+    raw_lines = []
+    headers = {'User-Agent': 'Mozilla/5.0'}
     
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
-    # تلاش اول: دانلود مستقیم
-    try:
-        req = urllib.request.Request(SUB_URL, headers=headers)
-        with urllib.request.urlopen(req, context=context, timeout=15) as response:
-            res = response.read().decode('utf-8', errors='ignore').strip()
-            if res and len(res) > 20:
-                return res
-    except Exception as e:
-        print(f"Direct fetch failed: {e}")
-
-    # تلاش دوم: استفاده از پراکسی واسط برای عبور از تحریم/بلاک
-    try:
-        proxy_url = "https://corsproxy.io/?" + urllib.parse.quote(SUB_URL)
-        req = urllib.request.Request(proxy_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, context=context, timeout=15) as response:
-            res = response.read().decode('utf-8', errors='ignore').strip()
-            if res and len(res) > 20:
-                return res
-    except Exception as e:
-        print(f"Proxy fetch failed: {e}")
-
-    return ""
-
-def fetch_and_process():
-    raw_content = get_content()
-    
-    if not raw_content:
-        print("Error: Could not retrieve content from subscription link.")
-        return
-
-    content = raw_content
-    if not any(raw_content.startswith(p) for p in ['vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria2://', 'tuic://']):
+    for url in SOURCES:
         try:
-            padded_content = raw_content + '=' * (-len(raw_content) % 4)
-            decoded = base64.b64decode(padded_content).decode('utf-8', errors='ignore').strip()
-            if decoded:
-                content = decoded
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=15) as response:
+                content = response.read().decode('utf-8', errors='ignore').strip()
+                
+                try:
+                    decoded = base64.b64decode(content).decode('utf-8', errors='ignore')
+                    lines = decoded.splitlines()
+                except Exception:
+                    lines = content.splitlines()
+                
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith(('vless://', 'vmess://', 'trojan://', 'ss://')):
+                        raw_lines.append(line)
         except Exception as e:
-            print(f"Base64 decode error: {e}")
+            print(f"Error fetching from {url}: {e}")
+            
+    return list(dict.fromkeys(raw_lines))
 
-    lines = [line.strip() for line in content.splitlines() if line.strip()]
-    
-    if len(lines) == 1 and not lines[0].startswith('vless://'):
-        for proto in ['vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria2://', 'tuic://']:
-            lines[0] = lines[0].replace(proto, f"\n{proto}")
-        lines = [line.strip() for line in lines[0].splitlines() if line.strip()]
-
-    processed_configs = []
-
-    for idx, line in enumerate(lines, start=1):
-        if not any(line.startswith(p) for p in ['vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria2://', 'tuic://']):
-            continue
-
-        superscript_num = to_superscript(idx)
-        new_name = f"@Configvibes {superscript_num}🐬"
-        encoded_name = urllib.parse.quote(new_name)
-
-        if '#' in line:
-            base_part = line.split('#')[0]
-            new_line = f"{base_part}#{encoded_name}"
+def rename_config(config_str, new_remark):
+    """تغییر نام رمارک کانفیگ"""
+    if any(config_str.startswith(proto) for proto in ['vless://', 'trojan://', 'ss://']):
+        if '#' in config_str:
+            base = config_str.split('#')[0]
+            return f"{base}#{new_remark}"
         else:
-            new_line = f"{line}#{encoded_name}"
+            return f"{config_str}#{new_remark}"
+            
+    elif config_str.startswith('vmess://'):
+        try:
+            b64_data = config_str[8:]
+            b64_data += '=' * (-len(b64_data) % 4)
+            data_json = json.loads(base64.b64decode(b64_data).decode('utf-8', errors='ignore'))
+            data_json['ps'] = new_remark
+            new_b64 = base64.b64encode(json.dumps(data_json).encode('utf-8')).decode('utf-8')
+            return f"vmess://{new_b64}"
+        except Exception:
+            return config_str
+            
+    return config_str
 
-        processed_configs.append(new_line)
+def process_configs():
+    configs = fetch_configs()
+    processed = []
+    
+    # نمونه‌برداری تصادفی از لیست ایموجی‌ها برای داشتن تنوع بالا
+    emoji_pool = random.choices(EMOJIS, k=MAX_CONFIGS)
+    
+    for i, cfg in enumerate(configs):
+        if len(processed) >= MAX_CONFIGS:
+            break
+            
+        emoji = emoji_pool[i]
+        renamed = rename_config(cfg, f"{emoji} {NEW_NAME} | {i+1}")
+        processed.append(renamed)
+        
+    # ذخیره متنی ساده
+    with open("configs.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(processed))
+        
+    # ذخیره به‌صورت Base64
+    b64_encoded = base64.b64encode("\n".join(processed).encode("utf-8")).decode("utf-8")
+    with open("sub_base64.txt", "w", encoding="utf-8") as f_b64:
+        f_b64.write(b64_encoded)
 
-    print(f"Total configs extracted: {len(processed_configs)}")
-
-    if processed_configs:
-        final_plain = "\n".join(processed_configs)
-        final_base64 = base64.b64encode(final_plain.encode('utf-8')).decode('utf-8')
-
-        # ذخیره خروجی در فایلی که ساختی
-        with open("Configvibes.txt", "w", encoding="utf-8") as f:
-            f.write(final_base64)
-
-        print("Configvibes.txt updated successfully!")
+    print(f"Successfully processed {len(processed)} configs with diverse emojis.")
 
 if __name__ == "__main__":
-    fetch_and_process()
+    process_configs()
